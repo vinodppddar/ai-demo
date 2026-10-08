@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: ai-animation-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-animation-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: ai-animation-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DEMO_MODE
+        value: "true"
+    healthCheckPath: /health
+
+  - type: worker
+    name: ai-animation-worker
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: celery -A app.workers.celery_app.celery worker --loglevel=INFO
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-animation-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: ai-animation-redis
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          name: ai-animation-api
+          type: web
+          envVarKey: SECRET_KEY
+      - key: DEMO_MODE
+        value: "true"
+
+  - type: keyvalue
+    name: ai-animation-redis
+    plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
+
+databases:
+  - name: ai-animation-db
+    plan: free
+    databaseName: animation
+    user: animation

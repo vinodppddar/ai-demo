@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: animation
+      POSTGRES_PASSWORD: animation
+      POSTGRES_DB: animation
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://animation:animation@db:5432/animation
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_DIR: /app/storage/uploads
+      GENERATED_DIR: /app/storage/generated
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build:
+      context: ./backend
+    command: celery -A app.workers.celery_app.celery worker --loglevel=INFO
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://animation:animation@db:5432/animation
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_DIR: /app/storage/uploads
+      GENERATED_DIR: /app/storage/generated
+    volumes:
+      - ./storage:/app/storage
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
